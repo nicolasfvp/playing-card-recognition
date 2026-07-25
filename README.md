@@ -1,189 +1,146 @@
-# 🃏 Reconhecimento de Cartas de Baralho com IA
+# Playing Card Recognition
 
-Projeto acadêmico (ICD/ADS) de **visão computacional**: treinar um modelo para
-**classificar cartas de baralho** a partir de uma imagem (53 classes = 52 cartas + coringa),
-usando *transfer learning* em PyTorch.
+An academic computer vision project (ICD/ADS) that classifies a playing card from a single
+image across 53 classes (52 cards plus the joker), using transfer learning with EfficientNet-B0
+in PyTorch.
 
-> **Status:** estrutura, código e documentação prontos. O treino é executado no
-> **Google Colab** (ver [`notebooks/treino_cartas_colab.ipynb`](notebooks/treino_cartas_colab.ipynb)).
-> **Métricas medidas** (Colab, GPU T4, `set_seed(42)`) preenchidas abaixo —
-> modelo principal: **94,7%** de acurácia no teste Kaggle.
+The code, documentation and experiment structure are complete. Training runs in Google Colab
+through the notebook [`notebooks/treino_cartas_colab.ipynb`](notebooks/treino_cartas_colab.ipynb).
+The main model reaches a measured test accuracy of 94.7 percent on the Kaggle test set
+(Colab, GPU T4, seed 42).
 
----
+## Tech stack
 
-## 🎯 Objetivo e impacto humano
+- Python 3
+- PyTorch and torchvision (transfer learning with pretrained backbones)
+- scikit-learn and scikit-image (classical baseline and metrics)
+- NumPy, pandas, Pillow (data and image handling)
+- Matplotlib and seaborn (plots and confusion matrices)
+- kagglehub (dataset download)
+- Google Colab and Jupyter notebook (training environment)
 
-Construir uma **ferramenta educacional** que reconhece cartas de baralho comuns, útil para:
+## What it does
 
-- **Educação** (foco principal): ensino de probabilidade, regras de jogos e matemática
-  para crianças e idosos; e como material didático para ensinar visão computacional.
-- **Acessibilidade** (secundário): ler a carta em voz alta para pessoas com deficiência visual,
-  usando um baralho **comum** (sem cartas especiais/caras).
-- **Pesquisa** (secundário): cartas são um *benchmark* didático para classificação,
-  *data augmentation* e *transfer learning*.
+- Classifies a playing card image into one of 53 classes (52 cards plus joker).
+- Trains a transfer learning model (EfficientNet-B0 by default) in two phases: feature
+  extraction with a frozen backbone, then fine-tuning of the full network with cosine
+  annealing and early stopping.
+- Supports alternative backbones (MobileNet V3 small/large, ResNet18) through a single
+  configuration flag.
+- Provides a classical baseline (HOG features plus logistic regression or SVM) to compare
+  against the deep model.
+- Runs controlled experiments: feature extraction versus fine-tuning, with versus without
+  data augmentation, and an out-of-distribution (OOD) check against a deck of a different
+  visual design.
+- Produces evaluation metrics, a per-class classification report, and confusion matrices
+  (see the `reports/` folder).
+- Runs single-image inference with top-k predictions from a trained checkpoint.
 
-> ⚠️ **Usos proibidos / fora de escopo:** este projeto **não** se destina a jogos de azar
-> com dinheiro real, apostas, cassinos online, nem a assistência em tempo real durante
-> partidas valendo dinheiro. Ver [`docs/03_etica_impacto.md`](docs/03_etica_impacto.md).
+## Results
 
----
+| Model | Test accuracy | Macro F1 | OOD accuracy |
+|-------|---------------|----------|--------------|
+| Baseline (HOG + logistic regression) | 70.6% | 0.698 | not measured |
+| EfficientNet-B0 (feature extraction) | 38.5% | 0.363 | not measured |
+| EfficientNet-B0 (fine-tuning), main model | 94.7% | 0.947 | 59.3% |
 
-## 🗂️ Estrutura do repositório
+The main model is EfficientNet-B0 with fine-tuning and data augmentation. The OOD column
+refers to a deck of a different visual design (clean web images), which measures the design
+gap rather than a real capture gap (photos with lighting, shadow and background variation),
+left as future work. Validation and test sets are small (5 images per class), so metrics
+should be read with wide uncertainty, which is why macro F1 and the confusion matrix are
+prioritized. See [`docs/RELATORIO_DESENVOLVIMENTO.md`](docs/RELATORIO_DESENVOLVIMENTO.md)
+for the full analysis.
 
+## Dataset
+
+[Cards Image Dataset-Classification (gpiosenka)](https://www.kaggle.com/datasets/gpiosenka/cards-image-datasetclassification):
+53 classes, images already cropped to 224x224, with a fixed train/valid/test split
+(7,624 / 265 / 265). Download instructions are in [`data/README.md`](data/README.md).
+
+For the OOD experiment, a deck of a different design is assembled from freely licensed clean
+images through the reproducible script `src/ood_design.py`, documented in
+[`docs/guia_ood_design_web.md`](docs/guia_ood_design_web.md).
+
+## Running locally
+
+Training on CPU is slow. Google Colab with a GPU is recommended for the full pipeline.
+
+Clone the repository:
+
+```bash
+git clone https://github.com/nicolasfvp/playing-card-recognition.git
+cd playing-card-recognition
 ```
-projeto-IA/
-├── src/                       # Código-fonte (pacote Python)
-│   ├── config.py              # Configuração central (hiperparâmetros, caminhos)
-│   ├── seed.py                # Reprodutibilidade (set_seed)
-│   ├── data.py                # Dataloaders e transformações (PyTorch)
-│   ├── model.py               # Transfer learning (EfficientNet-B0 / MobileNet / ResNet)
-│   ├── baseline.py            # Baseline clássico (HOG + Regressão Logística)
-│   ├── train.py               # Treino (feature extraction + fine-tuning, early stopping)
-│   ├── evaluate.py            # Métricas, matriz de confusão, avaliação OOD
-│   └── predict.py             # Inferência em uma imagem
-├── notebooks/
-│   └── treino_cartas_colab.ipynb   # Notebook de treino (Google Colab) — pipeline completo
-├── models/                    # Checkpoints treinados (não versionados)
-├── data/                      # Apenas instruções de download (ver data/README.md)
-├── docs/                      # Documentos do trabalho (definição, dados, ética, model card)
-├── reports/                   # Resultados, figuras e relatório final
-├── requirements.txt
-├── LICENSE                    # MIT
-└── README.md
-```
 
----
+### Option 1: Google Colab (recommended, free GPU)
 
-## 🧠 Abordagem
+1. Open [`notebooks/treino_cartas_colab.ipynb`](notebooks/treino_cartas_colab.ipynb) in Colab.
+2. Set the runtime hardware to GPU (T4).
+3. Edit the `REPO_URL` variable in the first cell to point to your repository.
+4. Run the cells in order (setup, data, baseline, training, evaluation, experiments, OOD).
 
-| Etapa | Método | Papel |
-|-------|--------|-------|
-| **Baseline** | HOG + Regressão Logística (scikit-learn) | linha de base barata (CPU) |
-| **Modelo principal** | Transfer learning **EfficientNet-B0** (PyTorch) | melhor acurácia/custo |
-| **Treino em 2 fases** | (1) backbone congelado → (2) *fine-tuning* do topo | generalização |
-
-### Experimentos (item 2.4)
-
-1. **Feature extraction (congelado) vs fine-tuning** — impacto na acurácia/overfitting.
-2. **Com vs sem *data augmentation*** — efeito na generalização.
-3. **Avaliação OOD** — teste do Kaggle vs **um baralho de design diferente** (imagens limpas da web); mede o *gap de design* (o modelo aprendeu o conceito da carta ou decorou o estilo do dataset?). O *gap de condições de captura* (fotos reais com luz/sombra/fundo) fica como trabalho futuro — ver [`docs/guia_coleta_baralho_real.md`](docs/guia_coleta_baralho_real.md).
-
----
-
-## 📊 Dataset
-
-**[Cards Image Dataset-Classification (gpiosenka)](https://www.kaggle.com/datasets/gpiosenka/cards-image-datasetclassification)**
-— 53 classes, imagens 224×224 já recortadas, split pronto (7.624 / 265 / 265).
-Detalhes e download em [`data/README.md`](data/README.md).
-
-Para o experimento de generalização (OOD), usamos um **baralho de design diferente** montado
-a partir de imagens limpas de licença livre — script reprodutível `src/ood_design.py` e
-guia em [`docs/guia_ood_design_web.md`](docs/guia_ood_design_web.md). Fotografar um baralho
-físico real (gap de captura) continua sendo o padrão-ouro e está descrito, como trabalho
-futuro, em [`docs/guia_coleta_baralho_real.md`](docs/guia_coleta_baralho_real.md).
-
----
-
-## 🚀 Como reproduzir
-
-### Opção 1 — Google Colab (recomendado, com GPU grátis)
-
-1. Suba este repositório para o GitHub.
-2. Abra [`notebooks/treino_cartas_colab.ipynb`](notebooks/treino_cartas_colab.ipynb) no Colab.
-3. `Ambiente de execução → Alterar o tipo de hardware → GPU (T4)`.
-4. Edite a variável `REPO_URL` na primeira célula com o link do seu repositório.
-5. Execute as células em ordem (setup → dados → baseline → treino → avaliação → experimentos → OOD).
-
-### Opção 2 — Local (CPU; instalar Python)
+### Option 2: Local (CPU)
 
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate   |   Linux/Mac: source .venv/bin/activate
 pip install -r requirements.txt
 
-# Baseline (rápido, CPU):
+# Classical baseline (fast on CPU):
 python -m src.baseline --data-dir data/raw/cards --max-per-class 80
 
-# Treino (lento em CPU; recomendado usar o Colab):
+# Training (slow on CPU; Colab is recommended):
 python -m src.train --data-dir data/raw/cards --backbone efficientnet_b0
 
-# Predição em uma imagem:
-python -m src.predict caminho/para/carta.jpg --checkpoint models/efficientnet_b0_best.pt
+# Inference on a single image:
+python -m src.predict path/to/card.jpg --checkpoint models/efficientnet_b0_best.pt
 ```
 
-> **Reprodutibilidade:** `set_seed(42)` em todo o pipeline, `requirements.txt` com versões
-> fixadas e split fixo. Documente a GPU usada (T4/P100) no relatório.
+Reproducibility is handled by a fixed seed (42) across the pipeline, pinned dependency
+versions in `requirements.txt`, and the dataset fixed split.
 
----
+## Project structure
 
-## 📈 Resultados
+```
+src/                    Source code (Python package)
+  config.py             Central configuration (hyperparameters, paths)
+  seed.py               Reproducibility (set_seed)
+  data.py               Dataloaders and transforms (PyTorch)
+  model.py              Transfer learning backbones (EfficientNet-B0, MobileNet, ResNet)
+  baseline.py           Classical baseline (HOG + logistic regression or SVM)
+  train.py              Two-phase training with early stopping
+  evaluate.py           Metrics, confusion matrix, OOD evaluation
+  ood_design.py         Builds the different-design OOD set
+  predict.py            Single-image inference
+notebooks/              Google Colab training notebook (full pipeline)
+models/                 Trained checkpoints (not versioned)
+data/                   Download instructions only (see data/README.md)
+docs/                   Problem definition, data, ethics, model card, development report
+reports/                Results, confusion matrices, classification report, experiments csv
+requirements.txt
+LICENSE                 MIT
+```
 
-| Modelo | Acurácia (teste) | F1 macro | Acurácia OOD |
-|--------|------------------|----------|--------------|
-| Baseline (HOG + LogReg) | 70,6% | 0,698 | — |
-| EfficientNet-B0 (feature extraction) | 38,5% | 0,363 | — |
-| **EfficientNet-B0 (fine-tuning)** ← modelo principal | **94,7%** | **0,947** | **59,3%** |
+## Documentation
 
-O **modelo principal** é o EfficientNet-B0 com *fine-tuning* **e** *data augmentation*
-(**94,7%** de acurácia / **0,947** de F1-macro no teste Kaggle), em linha com a referência da
-literatura (~93–95%) e bem acima do baseline (70,6%). No Experimento 2, a versão **sem**
-augmentation chegou a **97,4%** no teste limpo e **empatou** no OOD de design (ambas 59,3%).
-Adotamos a **com** augmentation como modelo principal por ser a escolha adequada ao uso real
-(fotos, onde se espera robustez a variações de captura) — sendo transparentes que esse ganho
-**não** foi medido aqui: a augmentation simula captura, não design, e o benefício exigiria um
-OOD de fotos reais (trabalho futuro). Conjuntos de val/teste pequenos (5 img/classe) → ler as
-métricas com incerteza ampla; por isso priorizamos **F1-macro** e a matriz de confusão.
+- [Problem definition and requirements](docs/01_definicao_problema.md)
+- [Data and preparation](docs/02_dados.md)
+- [Ethics and impact assessment](docs/03_etica_impacto.md)
+- [Model card](docs/MODEL_CARD.md)
+- [Development report](docs/RELATORIO_DESENVOLVIMENTO.md)
+- [Different-design OOD set guide](docs/guia_ood_design_web.md)
+- [Real deck collection guide (capture gap, future work)](docs/guia_coleta_baralho_real.md)
+- [Final report outline](reports/relatorio_final_outline.md)
 
-> A coluna **Acurácia OOD** refere-se ao baralho de **design diferente** (imagens limpas da web),
-> medindo o *gap de design* — não a um baralho fotografado em condições reais (gap de captura,
-> trabalho futuro). Ver Experimento 3 e `docs/guia_ood_design_web.md`.
+Note: the documents above are written in Portuguese.
 
----
+## Status
 
-## ⚠️ Limitações
+Academic project developed for an AI/ML/DL course (ICD/ADS). Code, documentation and
+experiments are complete; training is executed in Google Colab.
 
-- Modelo treinado em **um único tipo de baralho/estilo** → pode falhar com outros designs
-  (medido no experimento OOD), e também com iluminação ruim, oclusão ou fundos complexos
-  (gap de captura **não** medido aqui — exige fotos reais; ver trabalhos futuros).
-- Conjuntos de validação/teste do dataset são pequenos (5 imagens/classe) → métricas ruidosas.
-- Classificação assume **uma carta por imagem**; não detecta múltiplas cartas na cena
-  (detecção via YOLO fica como **trabalho futuro**).
+## License
 
----
-
-## 🔭 Trabalhos futuros
-
-- Detecção de múltiplas cartas na cena (YOLOv8/YOLO11).
-- **Conjunto OOD com fotos reais** (gap de captura): fotografar um baralho físico sob luz/fundo/ângulo
-  variados, complementando o atual OOD de "design diferente" (que mede só o gap de design).
-- Coleta de dataset mais diverso (vários baralhos, iluminações, oclusão).
-- App de leitura por voz (modo assistivo) com processamento *on-device*.
-
----
-
-## 📚 Documentação
-
-- [Definição do problema e requisitos](docs/01_definicao_problema.md) (item 2.1)
-- [Dados e preparação](docs/02_dados.md) (item 2.2)
-- [Avaliação ética e impacto](docs/03_etica_impacto.md) (item 2.5)
-- [Model Card](docs/MODEL_CARD.md)
-- [**Relatório de desenvolvimento**](docs/RELATORIO_DESENVOLVIMENTO.md) — decisões, técnicas, resultados, jornada e banco de perguntas para a defesa
-- [Guia do conjunto OOD "design diferente" (web)](docs/guia_ood_design_web.md) — usado na entrega atual
-- [Guia de coleta do baralho real (gap de captura — trabalho futuro)](docs/guia_coleta_baralho_real.md)
-- [Esqueleto do relatório final](reports/relatorio_final_outline.md) (itens 2.6 e 2.7)
-
----
-
-## 👥 Autores
-
-- **Nicolas**
-- **Herick**
-
-Projeto desenvolvido para a disciplina de IA/ML/DL (ICD/ADS).
-
----
-
-## 📄 Licença
-
-Código sob licença [MIT](LICENSE). O dataset do Kaggle possui licença própria
-(marcada como *"Other"*) — confirme antes de redistribuir as imagens.
+Released under the MIT License. See [LICENSE](LICENSE). The Kaggle dataset has its own
+license (marked as "Other"), so confirm the terms before redistributing the images.
